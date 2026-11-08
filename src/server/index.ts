@@ -639,50 +639,22 @@ app.get("/api/pending-jd", (req, res) => {
 /**
  * 公司画像：找出「开得起高薪、还在扩招」的公司
  *
- * 为什么不只看公司名：小而有钱、处于上升期的公司往往比大厂更舍得给钱。
- * 这里用「薪资 + 岗位数」当代理信号，
- * 而不是靠一份写死的大厂名单。
+ * 数据来自 company_watch 表（每周由 AI 更新一次，见 src/cli/companies.ts）。
+ * 表为空时退回实时聚合，保证面板不会白屏。
  */
 app.get("/api/companies", async (req, res) => {
-  const minSalary = parseFloat(String(req.query.minSalary || "25"));
-  const minJobs = parseInt(String(req.query.minJobs || "2"), 10);
   const limit = Math.min(parseInt(String(req.query.limit || "40"), 10), 200);
+  const { listWatch, aggregateCompanies, saveWatch } = await import("../companies.js");
+  const { OUTSOURCE_COMPANIES } = await import("../config.js");
 
-  // 只要「技术岗」多的公司：否则高薪的化工/地产/证券也会混进来
-  const TECH_JOB = "%AI%|%算法%|%模型%|%推理%|%平台%|%后端%|%架构%|%Agent%|%大模型%|%研发%|%工程师%|%Infra%";
-  const rows = db.prepare(`
-    SELECT company,
-           COUNT(*) AS jobs,
-           MAX(salary_max) AS maxSalary,
-           MIN(salary_min) AS minSalary,
-           SUM(CASE WHEN length(trim(jd)) >= 80 THEN 1 ELSE 0 END) AS withJd,
-           GROUP_CONCAT(DISTINCT platform) AS platforms,
-           MAX(city) AS city,
-           MAX(last_seen_at) AS lastSeen
-    FROM jobs
-    WHERE salary_max >= ? AND company != '' AND company NOT LIKE '%某%'
-      AND (${TECH_JOB.split("|").map(() => "title LIKE ?").join(" OR ")})
-    GROUP BY company
-    HAVING jobs >= ?
-    ORDER BY maxSalary DESC, jobs DESC
-    LIMIT ?
-  `).all(minSalary, ...TECH_JOB.split("|"), minJobs, limit) as any[];
-
-  const { OUTSOURCE_COMPANIES, COMPANY_TIERS } = await import("../config.js");
-  const tierOf = (co: string) =>
-    COMPANY_TIERS.s.some((n) => co.includes(n)) ? "S"
-    : COMPANY_TIERS.a.some((n) => co.includes(n)) ? "A"
-    : COMPANY_TIERS.b.some((n) => co.includes(n)) ? "B" : "成长型";
-
-  res.json({
-    rows: rows
-      .filter((r) => !OUTSOURCE_COMPANIES.test(r.company))   // 外包/人力公司不算机会
-      .map((r) => ({
-        company: r.company, jobs: r.jobs, maxSalary: r.maxSalary, minSalary: r.minSalary,
-        withJd: r.withJd, platforms: String(r.platforms || "").split(","),
-        city: r.city || "", tier: tierOf(r.company), lastSeen: r.lastSeen,
-      })),
-  });
+  let rows = listWatch(limit);
+  if (!rows.length) {
+    // 还没跑过每周任务：先给一份实时聚合的
+    const agg = aggregateCompanies(25, 2).filter((c) => !OUTSOURCE_COMPANIES.test(c.company));
+    saveWatch(agg);
+    rows = listWatch(limit);
+  }
+  res.json({ rows, updatedAt: rows[0]?.updatedAt || null });
 });
 
 app.listen(PORT, "127.0.0.1", () => {

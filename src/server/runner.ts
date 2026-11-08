@@ -6,7 +6,7 @@ import fs from "node:fs";
  * 任务运行器：把 CLI 变成 web 后台任务，实时把 stdout 推给前端
  */
 
-export type TaskKind = "daily" | "login" | "collect" | "score" | "report";
+export type TaskKind = "daily" | "login" | "collect" | "score" | "report" | "companies";
 export type TaskStatus = "idle" | "running" | "done" | "error";
 
 export interface TaskState {
@@ -51,6 +51,7 @@ const CMDS: Record<TaskKind, { script: string; args: string[] }> = {
   collect: { script: "src/cli/collect.ts", args: [] },
   score: { script: "src/cli/score.ts", args: [] },
   report: { script: "src/cli/report.ts", args: [] },
+  companies: { script: "src/cli/companies.ts", args: [] },
 };
 
 export function startTask(kind: TaskKind, extraEnv: Record<string, string> = {}, meta: { platform?: string } = {}): { ok: boolean; message: string } {

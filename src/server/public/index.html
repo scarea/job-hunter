@@ -319,19 +319,18 @@ button.ghost{background:#1c2028;color:var(--txt);border:1px solid var(--line)}
 
 
 
-  <!-- 💰 值得关注的公司：小而有钱 + 还在扩招 -->
+  <!-- 💰 值得关注的公司：每周由 AI 更新一次 -->
   <section class="panel" id="coPanel" style="margin-bottom:16px;display:none">
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
       <h2 style="margin:0;font-size:14px">💰 值得关注的公司</h2>
-      <span class="hint">
-        按「开得起多少薪 + 有几个岗」排，不靠大厂名单——
-        <b>小而有钱、正在上升期的公司往往比大厂更舍得给钱</b>。
-      </span>
+      <span class="hint" id="coMeta">AI 每周评一次：方向是否对口、值不值得投</span>
       <span style="flex:1"></span>
+      <button class="btn btn-ghost" onclick="refreshCompanies()">🔄 现在更新</button>
       <button class="btn btn-ghost" onclick="toggleCompanies()">展开/收起</button>
     </div>
-    <div id="coBody" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px"></div>
+    <div id="coBody" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:9px"></div>
   </section>
+
 
   <!-- ⚠️ 待补 JD：点开就自动补，补完自动重打分 -->
   <section class="panel" id="pendingPanel" style="margin-bottom:16px;display:none">

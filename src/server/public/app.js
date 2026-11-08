@@ -628,25 +628,55 @@ let _coOpen = true;
 
 async function loadCompanies() {
   try {
-    const d = await api("/api/companies?minSalary=25&minJobs=2&limit=24");
+    const d = await api("/api/companies?limit=60");
     const panel = $("#coPanel"), body = $("#coBody");
     if (!panel || !body) return;
-    if (!d.rows || !d.rows.length) { panel.style.display = "none"; return; }
+    // 有关注度的排前面（AI 已经按方向对口程度打过 0-100）
+    const rows = (d.rows || []).filter((r) => r.watch > 0 || r.jobs >= 2).slice(0, 30);
+    if (!rows.length) { panel.style.display = "none"; return; }
     panel.style.display = "block";
     body.style.display = _coOpen ? "grid" : "none";
-    body.innerHTML = d.rows.map((r) => {
-      const tierColor = r.tier === "成长型" ? "#7bd88f" : "#6aa6ff";
-      return `<div style="border:1px solid var(--line);border-radius:8px;padding:9px 11px;background:#12151c">
-        <div style="display:flex;align-items:baseline;gap:6px">
-          <b style="font-size:12.5px;color:#dfe6f1">${esc(r.company)}</b>
-          <span style="font-size:10px;color:${tierColor};border:1px solid ${tierColor}44;border-radius:4px;padding:0 4px">${r.tier}</span>
+    if (d.updatedAt) {
+      $("#coMeta").textContent = `AI 每周评一次 · 上次更新 ${new Date(d.updatedAt).toLocaleString("zh-CN", { hour12: false }).slice(0, 16)}`;
+    }
+    body.innerHTML = rows.map((r) => {
+      const tierColor = r.tier === "成长型" ? "#7bd88f" : r.tier === "S" ? "#6aa6ff" : "#c9a0ff";
+      const w = Number(r.watch) || 0;
+      const wColor = w >= 80 ? "#7bd88f" : w >= 60 ? "#f0b429" : "#8b97a8";
+      return `<div style="border:1px solid var(--line);border-radius:9px;padding:10px 12px;background:#12151c">
+        <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:3px">
+          <a href="${esc(r.careerUrl || "#")}" target="_blank" rel="noreferrer"
+             style="font-size:13px;font-weight:600;color:#dfe6f1;text-decoration:none;border-bottom:1px dashed rgba(223,230,241,.35)"
+             title="打开招聘页">${esc(r.company)}</a>
+          <span style="font-size:10px;color:${tierColor};border:1px solid ${tierColor}44;border-radius:4px;padding:0 4px">${esc(r.tier || "")}</span>
+          <span style="flex:1"></span>
+          ${w ? `<span style="font-size:11px;color:${wColor};font-weight:600">${w}</span>` : ""}
         </div>
-        <div style="font-size:11.5px;color:#8b97a8;margin-top:4px">
-          最高 <b style="color:#f0b429">${r.maxSalary}K</b> · ${r.jobs} 个岗 · ${r.city || "—"}
+        <div style="font-size:11.5px;color:#8b97a8">
+          最高 <b style="color:#f0b429">${r.maxSalary ?? "—"}K</b> · ${r.jobs} 个岗${r.city ? ` · ${esc(String(r.city).slice(0, 24))}` : ""}
+        </div>
+        ${r.note ? `<div style="font-size:11px;color:#7f8b9d;margin-top:5px;line-height:1.5">${esc(r.note)}</div>` : ""}
+        <div style="margin-top:7px;display:flex;gap:6px">
+          <a class="topener" href="${esc(r.careerUrl || "#")}" target="_blank" rel="noreferrer" style="text-decoration:none">↗ 招聘页</a>
+          ${r.website ? `<a class="topener" href="${esc(r.website)}" target="_blank" rel="noreferrer" style="text-decoration:none">官网</a>` : ""}
         </div>
       </div>`;
     }).join("");
   } catch { /* ignore */ }
+}
+
+async function refreshCompanies() {
+  const meta = $("#coMeta");
+  if (meta) meta.textContent = "AI 正在重新评估…（约 30 秒）";
+  try {
+    await fetch("/api/run/companies", { method: "POST" });
+    for (let i = 0; i < 40; i++) {
+      await new Promise((r) => setTimeout(r, 2000));
+      const st = await api("/api/run/status").catch(() => null);
+      if (!st || st.status !== "running") break;
+    }
+    await loadCompanies();
+  } catch (e) { if (meta) meta.textContent = "更新失败：" + e.message; }
 }
 
 function toggleCompanies() {

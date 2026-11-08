@@ -37,7 +37,7 @@ export function cookieHeader(c: CapturedRequest, url: string): string {
  * 把 URL / body 里的「页码」和「搜索词」替换成目标值
  * ⚠️ 搜索词必须替换，否则不同关键词会命中同一份快照、返回重复结果
  */
-export function withPage(c: CapturedRequest, page: number, query: string): { url: string; body?: string } {
+export function withPage(c: CapturedRequest, page: number, query: string, cityCode?: string): { url: string; body?: string } {
   let url = c.url;
   let body = c.postData;
 
@@ -53,6 +53,13 @@ export function withPage(c: CapturedRequest, page: number, query: string): { url
     }
   }
 
+  // --- 替换城市（智联的 postData 里是 "S_SOU_WORK_CITY":"765"）---
+  // 以前只换了关键词，城市一直沿用抓包时的深圳，导致「切城市」根本不生效
+  if (cityCode && body) {
+    body = body.replace(/("S_SOU_WORK_CITY"\s*:\s*")[^"]*(")/, `$1${cityCode}$2`);
+    body = body.replace(/("cityId"\s*:\s*")[^"]*(")/, `$1${cityCode}$2`);
+  }
+
   // 常见分页参数（curPage 从 0 开始，其余从 1 开始；智联用 pageIndex）
   const ONE_BASED = ["page", "pageNo", "pageIndex", "pageNum", "currentPage", "p"];
   for (const k of ONE_BASED) url = url.replace(new RegExp(`([?&]${k}=)\\d+`), `$1${page}`);
@@ -65,18 +72,39 @@ export function withPage(c: CapturedRequest, page: number, query: string): { url
   return { url, body };
 }
 
+/** 各平台「城市」所在的配置（值是抓包接口里的城市编码） */
+const CITY_ENV: Partial<Record<Platform, string>> = {
+  zhaopin: "ZHAOPIN_CITIES",
+};
+/** 没配环境变量时的默认城市（第一个常驻，其余轮转） */
+const DEFAULT_CITIES: Partial<Record<Platform, string>> = {
+  zhaopin: "765,530,538,763,801", // 深圳 北京 上海 广州 成都
+};
+
 export async function replayCollect(
   cap: CapturedRequest,
   platform: Platform,
   query: string,
   maxPages: number
 ): Promise<ReplayResult> {
+  // 回放时必须把城市一起换掉，否则不管搜哪个城市都返回抓包时的那个城市
+  const cityEnv = CITY_ENV[platform];
+  const allCities = cityEnv ? (process.env[cityEnv] || DEFAULT_CITIES[platform] || "").split(",").map((x) => x.trim()).filter(Boolean) : [];
+  // 第一个城市常驻，其余按天轮转一个（全采会让请求量翻几倍）
+  let cities: (string | undefined)[] = [undefined];
+  if (allCities.length === 1) cities = [allCities[0]];
+  else if (allCities.length > 1) {
+    const day = Math.floor(Date.now() / 86400_000);
+    cities = [allCities[0], allCities[1 + (day % (allCities.length - 1))]];
+  }
+  const cityCode = cities[0];
   const jobs: RawJob[] = [];
   const seen = new Set<string>();
   let pages = 0;
 
+  for (const city of cities) {
   for (let p = 1; p <= maxPages; p++) {
-    const { url, body } = withPage(cap, p, query);
+    const { url, body } = withPage(cap, p, query, city);
     try {
       const res = await fetch(url, {
         method: cap.method === "POST" ? "POST" : "GET",
@@ -126,5 +154,6 @@ export async function replayCollect(
     }
   }
 
+  }
   return { jobs, pages };
 }
