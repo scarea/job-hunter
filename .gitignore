@@ -1,0 +1,13 @@
+node_modules/
+data/*.db
+data/*.db-*
+data/*.md
+.env
+.chrome-profile/
+.cache/
+logs/
+*.log
+.DS_Store
+profile/resume.md
+profile/resume-source.*
+data/.task.lock

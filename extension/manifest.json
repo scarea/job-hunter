@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Job Hunter · 浏览即采集",
+  "version": "1.1.0",
+  "description": "被动转发招聘网站自己发出的岗位接口响应到本地看板。不主动请求、不点击、不修改页面。content.js 由 scripts/build-extension.sh 生成，请勿直接修改。",
+  "host_permissions": [],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.zhipin.com/*",
+        "https://www.liepin.com/*",
+        "https://www.zhaopin.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    }
+  ]
+}

@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Job Hunter · 岗位打分看板</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+:root{--bg:#0f1115;--card:#171a21;--line:#252a34;--txt:#e6e8ec;--dim:#8b93a1;--acc:#4f8cff;--good:#22c55e;--warn:#f59e0b;--bad:#ef4444}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.5 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+header{padding:18px 24px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+h1{font-size:17px;margin:0;font-weight:650}
+.tag{font-size:12px;color:var(--dim);border:1px solid var(--line);padding:2px 8px;border-radius:999px}
+main{padding:20px 24px;max-width:1400px;margin:0 auto}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.kpi .v{font-size:26px;font-weight:700;letter-spacing:.5px}
+.kpi .l{font-size:12px;color:var(--dim);margin-top:2px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+@media(max-width:900px){.grid2{grid-template-columns:1fr}}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px}
+.panel h2{font-size:14px;margin:0 0 12px;font-weight:600;color:var(--txt)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--dim);font-weight:500;font-size:12px;position:sticky;top:0;background:var(--card)}
+tr:hover td{background:#1c2028}
+a{color:var(--acc);text-decoration:none}
+a:hover{text-decoration:underline}
+.score{font-weight:700;font-variant-numeric:tabular-nums}
+.s70{color:var(--good)}.s50{color:var(--warn)}.s0{color:var(--dim)}
+.pill{font-size:11px;padding:1px 7px;border-radius:999px;border:1px solid var(--line);color:var(--dim)}
+.reason{color:var(--dim);font-size:12px;max-width:340px}
+
+.today{background:linear-gradient(160deg,#151b28,#12151c);border:1px solid #2b3242;border-radius:12px;padding:18px 20px;margin-bottom:20px}
+.today-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.today-title{font-size:16px;margin:0;font-weight:650}
+.today-date{color:var(--acc);font-size:14px;font-weight:600;margin-left:6px}
+.today-sub{font-size:12px;color:var(--dim);margin-top:4px}
+.today-badge{background:#1d2432;border:1px solid #2b3242;border-radius:999px;padding:5px 12px;font-size:12px;color:var(--dim)}
+.today-list{display:grid;gap:8px}
+.tcard{display:grid;grid-template-columns:46px 1fr auto;gap:12px;align-items:center;background:#12151c;border:1px solid #232937;border-radius:9px;padding:11px 13px;transition:border-color .15s}
+.tcard:hover{border-color:#3a4a68}
+.trank{font-size:15px;font-weight:700;color:var(--dim);text-align:center}
+.trank.hot{color:#f59e0b}
+.tmain{min-width:0}
+.ttitle{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ttitle a{color:#6aa6ff;text-decoration:none;border-bottom:1px dashed rgba(106,166,255,.45)}
+.ttitle a:hover{color:#8dbcff;border-bottom-style:solid}
+.tcard{cursor:pointer}
+.tcard:hover .ttitle a{color:#8dbcff}
+.topener{font-size:12px;padding:3px 9px;border-radius:6px;border:1px solid #2b3242;color:#9fb0c7;background:#1a2130;cursor:pointer;white-space:nowrap}
+.topener:hover{border-color:#3a4a68;color:#cfe0ff}
+.tmeta{font-size:12px;color:var(--dim);margin-top:3px;display:flex;gap:10px;flex-wrap:wrap}
+.tmeta b{color:#a8b3c4;font-weight:500}
+.treason{font-size:12px;color:#7b8494;margin-top:5px;line-height:1.45}
+.tscore{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;text-align:right;min-width:52px}
+.empty{color:var(--dim);text-align:center;padding:26px 0;font-size:13px}
+
+
+.ctrl{max-width:1400px;margin:18px auto 0;padding:0 24px}
+.ctrl-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.btn-primary{background:#2f6bff;color:#fff;border:0;padding:9px 18px;border-radius:8px;font-size:13.5px;font-weight:600;cursor:pointer}
+.btn-primary:hover{background:#3f7bff}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed}
+.btn{background:#1c2230;color:var(--txt);border:1px solid var(--line);padding:9px 16px;border-radius:8px;font-size:13.5px;cursor:pointer}
+.btn:hover{border-color:#3a4a68}
+.btn-danger{color:#ff8b8b;border-color:#4a2b2b}
+.btn-ghost{background:transparent}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.ctrl-status{font-size:12.5px;color:var(--dim);padding:4px 10px;border-radius:999px;background:#12161e;border:1px solid var(--line)}
+.ctrl-status.running{color:#ffd479;border-color:#4a3f22;background:#211c10}
+.ctrl-status.done{color:#7ee2a8;border-color:#22452f;background:#0f1d15}
+.ctrl-status.error{color:#ff8b8b;border-color:#4a2b2b;background:#1e1113}
+.cfg{margin-top:10px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px}
+.cfg-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.cfg label{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--dim)}
+.resume-box{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--dim);margin-top:14px}
+.resume-box textarea{background:#0f1218;border:1px solid var(--line);color:var(--txt);padding:10px;border-radius:7px;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;resize:vertical}
+.cfg input{background:#0f1218;border:1px solid var(--line);color:var(--txt);padding:8px 10px;border-radius:7px;font-size:13px}
+.hint{font-size:11.5px;color:#6b7382}
+.logpanel{margin-top:10px;background:#0b0e13;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.loghead{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--line);font-size:12.5px}
+.logbody{margin:0;padding:12px;max-height:340px;overflow:auto;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:#9fb0c7;white-space:pre-wrap;word-break:break-all}
+
+canvas{max-height:240px}
+.controls{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+input,select{background:#0f1218;border:1px solid var(--line);color:var(--txt);padding:7px 10px;border-radius:7px;font-size:13px}
+button{background:var(--acc);color:#fff;border:0;padding:7px 14px;border-radius:7px;cursor:pointer;font-size:13px}
+button.ghost{background:#1c2028;color:var(--txt);border:1px solid var(--line)}
+.scroll{max-height:620px;overflow:auto}
+
+/* 关键词策略 */
+.strat-chips{display:flex;gap:6px;flex-wrap:wrap}
+.strat-chips .chip{font-size:12px;padding:3px 8px;border-radius:999px;border:1px solid var(--line);color:var(--dim);background:#12151c;cursor:pointer}
+.strat-chips .chip:hover{color:var(--txt);border-color:#3a4a68}
+.strat-log{font-size:12px;color:var(--dim);display:flex;flex-direction:column;gap:3px;max-height:180px;overflow:auto}
+.st-badge{font-size:11px;padding:0 6px;border-radius:999px;border:1px solid var(--line)}
+.st-badge.active{color:#7ee2a8;border-color:#1d6b3e}
+.st-badge.candidate{color:#ffd479;border-color:#4a3f22}
+.st-badge.retired{color:#6b7382}
+#stratTable td .x{background:transparent;color:var(--dim);border:1px solid var(--line);padding:1px 7px;font-size:11.5px;border-radius:6px}
+
+/* 平台状态 */
+.plat-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-top:10px}
+.pcard{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--dim);border-radius:10px;padding:10px 12px;display:grid;grid-template-columns:1fr auto;grid-template-rows:auto auto auto;column-gap:8px;align-items:center}
+.pcard.st-ok{border-left-color:var(--good)}
+.pcard.st-need_verify,.pcard.st-need_login{border-left-color:var(--warn);background:#1d1a12}
+.pname{font-weight:600;font-size:13.5px}
+.pstate{font-size:12px;color:var(--dim);grid-column:1}
+.pcard.st-need_verify .pstate,.pcard.st-need_login .pstate{color:#ffd479}
+.preason{font-size:11.5px;color:#6b7382;grid-column:1/3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pbtn{grid-column:2;grid-row:1/3;background:#1c2230;color:var(--txt);border:1px solid var(--line);padding:6px 12px;border-radius:7px;font-size:12.5px}
+.pbtn.hot{background:#2f6bff;border-color:#2f6bff;color:#fff;font-weight:600}
+
+/* 推荐卡片上的操作 */
+.tcard{grid-template-columns:46px 1fr auto}
+.tcard.done{opacity:.45}
+.tside{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.acts{display:flex;gap:4px}
+.acts .act{background:transparent;color:var(--dim);border:1px solid var(--line);padding:2px 8px;font-size:11.5px;border-radius:6px}
+.acts .act:hover{color:var(--txt);border-color:#3a4a68}
+.acts .act.on{color:#fff;background:#2f4f8f;border-color:#2f4f8f}
+.spill{font-size:11px;margin-left:6px;padding:0 6px;border-radius:999px;border:1px solid var(--line);color:var(--dim);font-weight:500}
+.spill.st-applied{color:#7ee2a8;border-color:#1d6b3e}
+.spill.st-later{color:#ffd479;border-color:#4a3f22}
+.backlog-head{cursor:pointer;color:var(--dim);font-size:13px;user-select:none;margin-bottom:8px}
+.backlog-head:hover{color:var(--txt)}
+
+/* 标签过滤 */
+.tagpanel{margin-bottom:20px}
+.tag-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.tag-head h2{margin:0}
+.tf-toggle{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--dim);cursor:pointer}
+.tag-add{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.tag-list{display:flex;flex-direction:column;gap:6px}
+.tchip{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#12151c;border:1px solid var(--line);border-left:3px solid var(--acc);border-radius:8px;padding:7px 10px;font-size:13px}
+.tchip.m-only{border-left-color:var(--good)}
+.tchip.m-exclude{border-left-color:var(--bad)}
+.tchip .kw{color:var(--dim);font-size:12px;max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tchip .hits{color:#6b7382;font-size:12px}
+.tchip select{padding:3px 6px;font-size:12px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;margin-left:auto}
+.seg button{background:transparent;color:var(--dim);border:0;border-radius:0;padding:4px 10px;font-size:12px}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on{color:#fff}
+.seg button.on.m-mark{background:#2f4f8f}
+.seg button.on.m-only{background:#1d6b3e}
+.seg button.on.m-exclude{background:#7a2b2b}
+.tchip button.x{background:transparent;color:var(--dim);border:1px solid var(--line);padding:2px 8px;font-size:12px}
+.tchip button.x:hover{color:var(--txt);border-color:#3a4a68}
+.tpill{font-size:11px;padding:0 6px;border-radius:999px;border:1px solid #2f4f8f;color:#8fb2ff;margin-left:4px;white-space:nowrap}
+.tpill.m-only{border-color:#1d6b3e;color:#7ee2a8}
+.tpill.m-exclude{border-color:#7a2b2b;color:#ff8b8b}
+</style>
+</head>
+<body>
+<header>
+  <h1>🎯 Job Hunter</h1>
+  <span class="tag">只读采集 · 不自动投递</span>
+  <span class="tag" id="ver">打分卡 —</span>
+  <span style="flex:1"></span>
+  <button class="ghost" onclick="loadAll()">刷新</button>
+</header>
+
+
+<!-- ⭐ 控制面板 -->
+<section class="ctrl">
+  <div class="ctrl-row">
+    <button id="btnRun" class="btn-primary" onclick="runDaily()">▶ 立即运行一轮</button>
+    <button class="btn" onclick="openSearches()" title="按关键词策略今天选出的词打开 BOSS / 猎聘 / 智联搜索页（只打开网页，数据由采集脚本在你浏览时收下）">🌐 打开今天的搜索页</button>
+    <button id="btnLogin" class="btn" onclick="doLogin()" title="依次处理所有需要登录/验证的平台">🔐 一键处理</button>
+    <button id="btnStop" class="btn btn-danger" onclick="doStop()" disabled>⏹ 停止</button>
+    <span id="openPlan" class="hint" style="font-size:12px"></span>
+    <span id="runStatus" class="ctrl-status">空闲</span>
+    <span style="flex:1"></span>
+    <button class="btn btn-ghost" onclick="toggleLog()">📜 日志</button>
+    <button class="btn btn-ghost" onclick="toggleCfg()">⚙️ 配置</button>
+  </div>
+
+  <!-- 平台状态：哪个平台要你动手，一眼看到，点一下处理 -->
+  <div id="platStrip" class="plat-strip"></div>
+
+  <!-- 配置抽屉 -->
+  <div id="cfgPanel" class="cfg" style="display:none">
+    <div class="cfg-grid">
+      <label>DeepSeek Key <span id="keyHint" class="hint"></span>
+        <input id="cfgKey" type="password" placeholder="sk-...">
+      </label>
+      <label>种子关键词（逗号分隔；永不淘汰，其余由关键词策略自动调整）
+        <input id="cfgQueries" type="text" placeholder="AI大模型,模型平台,Agent">
+      </label>
+      <label>每个关键词抓几页
+        <input id="cfgPages" type="number" min="1" max="10">
+      </label>
+      <label>每次补详情条数
+        <input id="cfgDetail" type="number" min="0" max="200">
+      </label>
+      <label>推荐条数
+        <input id="cfgTop" type="number" min="5" max="50">
+      </label>
+      <label>「打开搜索页」用几个词
+        <input id="cfgOpenKw" type="number" min="1" max="5" title="策略每天选出 8 个词，这里决定拿前几个去开会话">
+      </label>
+    </div>
+    <label class="resume-box">我的简历（打分时逐条对照它；保存后下一轮所有岗位按新简历重新打分）
+      <span style="display:flex;gap:8px;align-items:center">
+        <input type="file" id="resumeFile" accept=".pdf,.docx,.doc,.md,.txt,.rtf,.pages" style="display:none" onchange="uploadResume(this.files[0])">
+        <button type="button" class="btn" style="padding:5px 12px;font-size:12px" onclick="document.getElementById('resumeFile').click()">📄 上传简历文件</button>
+        <span class="hint">PDF / Word / Markdown / TXT，上传后自动提取文字，也可以在下面直接改</span>
+      </span>
+      <textarea id="cfgResume" rows="10" placeholder="把简历全文粘贴到这里（Markdown / 纯文本都行）"></textarea>
+      <span id="resumeHint" class="hint"></span>
+    </label>
+    <div style="margin-top:12px;display:flex;gap:10px">
+      <button class="btn-primary" onclick="saveConfig()">保存配置</button>
+      <span id="cfgMsg" class="hint"></span>
+    </div>
+  </div>
+
+  <!-- 日志抽屉 -->
+  <div id="logPanel" class="logpanel" style="display:none">
+    <div class="loghead">
+      <b>运行日志</b>
+      <span id="logMeta" class="hint"></span>
+      <span style="flex:1"></span>
+      <button class="btn btn-ghost" onclick="clearLog()">清空</button>
+    </div>
+    <pre id="logBody" class="logbody">（还没有运行记录）</pre>
+  </div>
+</section>
+
+<main>
+  <!-- 🏷 标签过滤 -->
+  <section class="panel tagpanel">
+    <div class="tag-head">
+      <h2>🏷 标签过滤</h2>
+      <span class="hint">命中「不看」的岗位不推荐；有「仅看」标签时，只推荐命中其中任意一个的岗位；「不看」优先。</span>
+      <span style="flex:1"></span>
+      <label class="tf-toggle"><input type="checkbox" id="tagFilterOn" checked onchange="toggleTagFilter(this.checked)"> 应用过滤</label>
+    </div>
+    <div class="tag-add">
+      <input id="tagName" placeholder="标签名，如 外包" maxlength="30" style="width:150px">
+      <input id="tagKw" placeholder="关键词，逗号分隔（留空 = 标签名）" style="flex:1;min-width:200px" onkeydown="if(event.key==='Enter')addTag()">
+      <select id="tagMode"><option value="exclude">不看</option><option value="only">仅看</option><option value="mark">仅标记</option></select>
+      <select id="tagScope"><option value="basic">匹配 标题/公司</option><option value="all">匹配 含 JD 正文</option></select>
+      <button onclick="addTag()">添加标签</button>
+      <span id="tagMsg" class="hint"></span>
+    </div>
+    <div id="tagList" class="tag-list"></div>
+  </section>
+
+  <!-- 🔁 关键词策略 -->
+  <section class="panel tagpanel">
+    <div class="tag-head">
+      <h2>🔁 关键词策略</h2>
+      <span class="hint">每轮按收益自动调整：收益高的多搜，保留约 30% 名额试新词；种子词和📌钉住的词不会被淘汰；岗位变少时自动「拓宽」。</span>
+      <span style="flex:1"></span>
+      <button class="btn btn-ghost" style="padding:5px 12px;font-size:12px" onclick="toggleStrategy()"><span id="stratArrow">▸</span> 详情</button>
+    </div>
+    <div class="hint" style="margin-bottom:8px">下一轮会搜：<span id="stratPlan">—</span></div>
+    <div id="stratBody" style="display:none">
+      <div class="tag-add">
+        <input id="stratKw" placeholder="手动添加关键词，如 MaaS" maxlength="20" style="width:220px" onkeydown="if(event.key==='Enter')stratAdd()">
+        <button onclick="stratAdd()">添加</button>
+        <span id="stratMsg" class="hint"></span>
+      </div>
+      <div class="scroll" style="max-height:340px">
+        <table id="stratTable">
+          <thead><tr><th>关键词</th><th>状态</th><th>来源</th><th>跑了</th><th>平均收益</th><th>新岗位 / 好岗位</th><th>说明</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="hint" style="margin:12px 0 6px">打分时 AI 建议的词（还没进词表，按岗位分数加权）：</div>
+      <div id="stratSugg" class="strat-chips"></div>
+      <div class="hint" style="margin:12px 0 6px">最近调整：</div>
+      <div id="stratLog" class="strat-log"></div>
+    </div>
+  </section>
+
+
+  <!-- ⭐ 浏览即采集：油猴脚本 / MV3 插件 被动转发 -->
+  <section class="panel" id="importPanel" style="margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+      <h2 style="margin:0;font-size:14px">🧩 浏览即采集（BOSS / 猎聘）</h2>
+      <span class="hint">装一次脚本。之后你正常刷页面，岗位自动进看板——不主动请求、不点击、不模拟操作。</span>
+      <span style="flex:1"></span>
+      <a class="btn-primary" href="/job-hunter.user.js" download style="text-decoration:none">⬇ 下载油猴脚本</a>
+      <button class="btn btn-ghost" onclick="toggleImport()">展开/收起</button>
+    </div>
+
+    <div id="importBody" style="display:none">
+      <div class="hint" style="line-height:1.9;margin-bottom:12px">
+        <b style="color:#a8b3c4">① 装（二选一，装在你平时浏览招聘网站的那个浏览器里）</b><br>
+        · <b>油猴</b>：先装 Tampermonkey 扩展 → 点上面「下载油猴脚本」→ 在弹出的安装页点安装（以后看板更新脚本会自动更新）<br>
+        · <b>插件</b>：chrome://extensions → 打开「开发者模式」→「加载已解压的扩展程序」→ 选项目里的 <code>extension/</code> 目录<br>
+        · 第一次在 BOSS / 猎聘页面上，Chrome 可能弹「允许访问本地网络上的设备」→ 点<b>允许</b>（脚本要把数据交给本机看板）
+      </div>
+      <div class="hint" style="line-height:1.9;margin-bottom:12px">
+        <b style="color:#a8b3c4">② 用</b><br>
+        · 点「🌐 打开今天的搜索页」（默认用 Google Chrome 打开；在 .env 里设 <code>SEARCH_BROWSER</code> 可换成别的浏览器）→ 正常往下翻几页<br>
+        · <b>列表</b>：脚本旁听页面自己收到的岗位数据（BOSS <code>joblist.json</code>、猎聘 <code>pc-search-job</code>），BOSS 薪资是明文<br>
+        · <b>JD</b>：在搜索页点开岗位卡片，或从看板点进岗位详情页，脚本会读下这一页的 JD 并重新打分<br>
+        · 新岗位导入 1 分钟后自动打分，够格的追加进「今日推荐」<br>
+        · 页面右下角小徽标显示收到了多少条；脚本<b>不会</b>自己去请求任何页面或接口
+      </div>
+      <details style="margin-top:8px">
+        <summary class="hint" style="cursor:pointer">手动粘贴（兜底）</summary>
+        <textarea id="importText" placeholder="粘贴脚本转发的 JSON，或一行一个岗位链接"
+          style="width:100%;min-height:90px;margin-top:8px;background:#0f1218;border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:10px;font:12.5px/1.6 ui-monospace,Menlo,monospace"></textarea>
+        <div style="margin-top:8px;display:flex;gap:10px;align-items:center">
+          <button class="btn-primary" onclick="doImport()">导入并打分</button>
+          <span id="importMsg" class="hint"></span>
+        </div>
+      </details>
+    </div>
+  </section>
+
+
+
+
+  <!-- 💰 值得关注的公司：小而有钱 + 还在扩招 -->
+  <section class="panel" id="coPanel" style="margin-bottom:16px;display:none">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+      <h2 style="margin:0;font-size:14px">💰 值得关注的公司</h2>
+      <span class="hint">
+        按「开得起多少薪 + 有几个岗」排，不靠大厂名单——
+        <b>小而有钱、正在上升期的公司往往比大厂更舍得给钱</b>。
+      </span>
+      <span style="flex:1"></span>
+      <button class="btn btn-ghost" onclick="toggleCompanies()">展开/收起</button>
+    </div>
+    <div id="coBody" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px"></div>
+  </section>
+
+  <!-- ⚠️ 待补 JD：点开就自动补，补完自动重打分 -->
+  <section class="panel" id="pendingPanel" style="margin-bottom:16px;display:none">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+      <h2 style="margin:0;font-size:14px">⚠️ 待补 JD</h2>
+      <span class="hint">
+        这些岗位<b>没有 JD，分数被封顶在 65</b>，进不了推荐。
+        点开你感兴趣的（装了采集脚本时），脚本会读下详情页的 JD 并重新打分——<b>不用每个都点</b>。
+      </span>
+      <span style="flex:1"></span>
+      <button class="btn btn-ghost" onclick="togglePending()">展开/收起</button>
+    </div>
+    <div id="pendingBody" class="today-list"></div>
+  </section>
+
+  <!-- ⭐ 今日推荐（首页主区） -->
+  <section class="today">
+    <div class="today-head">
+      <div>
+        <h2 class="today-title">今日推荐 <span id="todayDate" class="today-date"></span></h2>
+        <div class="today-sub" id="todayMeta">—</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div class="today-badge" id="todayBadge">—</div>
+        <button class="btn btn-ghost" style="padding:5px 12px;font-size:12px" onclick="rebuildToday()" title="把今天还没处理的换成下一批">换一批</button>
+      </div>
+    </div>
+    <div id="todayList" class="today-list"></div>
+    <div id="backlogWrap" style="display:none;margin-top:14px">
+      <div class="backlog-head" onclick="toggleBacklog()"><span id="backlogArrow">▸</span> 待处理 <b id="backlogCount">0</b> 个（之前推荐过还没处理的 + 稍后再看）</div>
+      <div id="backlogList" class="today-list" style="display:none"></div>
+    </div>
+  </section>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="grid2">
+    <div class="panel"><h2>平台分布</h2><canvas id="cPlatform"></canvas></div>
+    <div class="panel"><h2>分数分布</h2><canvas id="cDist"></canvas></div>
+  </div>
+
+  <div class="panel" style="margin-bottom:20px">
+    <h2>每日采集趋势</h2><canvas id="cTrend" style="max-height:200px"></canvas>
+  </div>
+
+  <div class="panel" style="margin-bottom:20px">
+    <h2>TOP 20 推荐岗位</h2>
+    <div class="scroll">
+      <table id="topTable">
+        <thead><tr><th>#</th><th>分数</th><th>岗位</th><th>公司</th><th>薪资</th><th>城市</th><th>理由</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>全部岗位</h2>
+    <div class="controls">
+      <input id="q" placeholder="搜岗位 / 公司" style="width:200px">
+      <select id="plat"><option value="">全部平台</option><option value="boss">BOSS</option><option value="zhaopin">智联</option><option value="liepin">猎聘</option></select>
+      <select id="minScore"><option value="">全部分数</option><option value="70">≥70 建议投</option><option value="50">≥50 可投</option><option value="0">≥0</option></select>
+      <button onclick="loadJobs(0)">搜索</button>
+      <span id="jobsMeta" class="hint" style="align-self:center"></span>
+    </div>
+    <div class="scroll">
+      <table id="jobTable">
+        <thead><tr><th>分数</th><th>岗位</th><th>公司</th><th>薪资</th><th>城市</th><th>平台</th><th>理由</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel" style="margin:20px 0">
+    <h2>打分模型回归（版本对比）</h2>
+    <div class="controls">
+      <select id="v1"></select><span style="color:var(--dim)">vs</span><select id="v2"></select>
+      <button onclick="loadCompare()">对比</button>
+    </div>
+    <div class="scroll" style="max-height:400px">
+      <table id="cmpTable">
+        <thead><tr><th>岗位</th><th>公司</th><th>旧分</th><th>新分</th><th>变化</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
