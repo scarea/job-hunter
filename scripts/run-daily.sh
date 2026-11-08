@@ -20,6 +20,9 @@ notify_fail() {
   echo "开始时间: $(date '+%Y-%m-%d %H:%M:%S')"
   echo "=============================="
 
+  # 先备份数据库：万一这一轮采集/打分把库写坏，还能退回昨天的快照
+  "$PROJECT_DIR/scripts/backup-db.sh" || echo "⚠️ 备份失败（继续跑）"
+
   # .env 由 Node（dotenv）自己加载；不要用 bash 去 source：值里有空格（如「后端开发 AI」）会被截断还会被当成命令执行
 
   # 不用 headless：BOSS / 猎聘能识别无头浏览器（开源项目实测「无头必被检测」）。
@@ -62,3 +65,4 @@ notify_fail() {
   [ "$EXIT" -ne 0 ] && notify_fail "退出码 $EXIT，详见 logs/daily-$(date +%Y-%m-%d).log"
   exit $EXIT
 } >> "$LOG" 2>&1
+

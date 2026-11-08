@@ -151,25 +151,50 @@ export function listWatch(limit = 60): CompanyWatchRow[] {
   }));
 }
 
-/** 从 jobs 表现算一遍公司画像（不含 AI 点评），供每周任务用 */
-export function aggregateCompanies(minSalary = 25, minJobs = 2): Omit<CompanyWatchRow, "tier" | "note" | "watch" | "updatedAt">[] {
+/**
+ * 把「深圳,深圳市,北京/上海,北京市/深圳市」收敛成「深圳/北京/上海」。
+ * 以前只取 MAX(city)，多城市公司永远只显示一个城市。
+ */
+export function normalizeCities(raw: string): string {
+  const set = new Set<string>();
+  for (const part of raw.split(",")) {
+    for (const c of part.split(/[\/、]/)) {
+      const name = c.trim().replace(/市$/, "");
+      if (/^(北京|上海|深圳|广州|成都|杭州|南京|武汉|西安|苏州|长沙|香港|新加坡)$/.test(name)) set.add(name);
+    }
+  }
+  const order = ["深圳", "北京", "上海", "广州", "成都", "杭州", "南京", "武汉", "西安", "苏州", "长沙", "香港", "新加坡"];
+  return [...set].sort((a, b) => order.indexOf(a) - order.indexOf(b)).join("/");
+}
+
+/**
+ * 从 jobs 表现算公司画像（不含 AI 点评），供每周任务用。
+ *
+ * 两个要点：
+ *  1) 按「基础公司名」归并——采集时公司名常带部门后缀（「深信服·研发体系」），
+ *     不归并的话同一家公司会被拆成十几行
+ *  2) 允许没有薪资的公司进来（官网接口大多不给薪资），但那恰恰是热门 AI 公司，
+ *     所以无薪资的要求至少 2 个技术岗
+ */
+export function aggregateCompanies(minSalary = 20, minJobs = 1): Omit<CompanyWatchRow, "tier" | "note" | "watch" | "updatedAt">[] {
   const rows = db.prepare(`
-    SELECT company,
-           COUNT(*) AS jobs,
-           MAX(salary_max) AS maxSalary,
-           MIN(salary_min) AS minSalary,
-           GROUP_CONCAT(DISTINCT platform) AS platforms,
-           MAX(city) AS city
+    SELECT
+      TRIM(substr(company, 1, CASE WHEN instr(company, '·') > 0 THEN instr(company, '·') - 1 ELSE length(company) END)) AS company,
+      COUNT(*) AS jobs,
+      MAX(salary_max) AS maxSalary,
+      MIN(salary_min) AS minSalary,
+      GROUP_CONCAT(DISTINCT platform) AS platforms,
+      GROUP_CONCAT(DISTINCT city) AS city
     FROM jobs
-    WHERE salary_max >= ? AND company != '' AND company NOT LIKE '%某%'
+    WHERE company != '' AND company NOT LIKE '%某%'
       AND (title LIKE '%AI%' OR title LIKE '%算法%' OR title LIKE '%模型%' OR title LIKE '%推理%'
         OR title LIKE '%平台%' OR title LIKE '%后端%' OR title LIKE '%架构%' OR title LIKE '%Agent%'
         OR title LIKE '%大模型%' OR title LIKE '%研发%' OR title LIKE '%工程师%' OR title LIKE '%Infra%')
     GROUP BY company
-    HAVING jobs >= ?
-    ORDER BY maxSalary DESC, jobs DESC
-    LIMIT 200
-  `).all(minSalary, minJobs) as any[];
+    HAVING jobs >= ? AND (maxSalary >= ? OR jobs >= 2)
+    ORDER BY COALESCE(maxSalary, 0) DESC, jobs DESC
+    LIMIT 300
+  `).all(minJobs, minSalary) as any[];
 
   return rows.map((r) => {
     const links = resolveLinks(r.company);
@@ -181,7 +206,7 @@ export function aggregateCompanies(minSalary = 25, minJobs = 2): Omit<CompanyWat
       maxSalary: r.maxSalary,
       minSalary: r.minSalary,
       platforms: String(r.platforms || "").split(",").filter(Boolean),
-      city: r.city || "",
+      city: normalizeCities(String(r.city || "")),
     };
   });
 }

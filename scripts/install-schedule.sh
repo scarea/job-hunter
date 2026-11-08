@@ -103,6 +103,37 @@ PLIST
   echo "   · 每天 ${OPEN_HOUR:-8}:${OPEN_MINUTE:-30} 打开三个搜索页（只开网页，不抓取）"
 fi
 
+# ---------- 4. 每周更新「值得关注的公司」（周一 09:00）----------
+cat > "$AGENTS/com.jobhunter.companies.plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.jobhunter.companies</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>-lc</string>
+    <string>cd "$PROJECT_DIR" &amp;&amp; PATH="$NODE_BIN:$PATH" node_modules/.bin/tsx src/cli/companies.ts &gt;&gt; "$PROJECT_DIR/logs/companies.log" 2&gt;&amp;1</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Weekday</key><integer>1</integer>
+    <key>Hour</key><integer>9</integer>
+    <key>Minute</key><integer>0</integer>
+  </dict>
+  <key>RunAtLoad</key><false/>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>$NODE_BIN:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+</dict>
+</plist>
+PLIST
+launchctl unload "$AGENTS/com.jobhunter.companies.plist" 2>/dev/null || true
+launchctl load "$AGENTS/com.jobhunter.companies.plist"
+echo "   · 每周一 09:00 用 AI 更新「值得关注的公司」"
+
 echo "✅ 已安装："
 echo "   · 每天 04:00 自动采集打分   → logs/daily-YYYY-MM-DD.log"
 echo "   · 看板常驻 http://localhost:5173"
