@@ -1,5 +1,5 @@
 import type { OfficialSource } from "./types.js";
-import { feishuSource } from "./feishu.js";
+import { feishuSource, FEISHU_CITY } from "./feishu.js";
 import { alibaba, antgroup } from "./alibaba.js";
 import { meituan } from "./meituan.js";
 import { baidu, huawei, vivo, netease, jd_com } from "./others.js";
@@ -13,6 +13,19 @@ export const SOURCES: OfficialSource[] = [
   feishuSource({
     id: "bytedance", company: "字节跳动", host: "jobs.bytedance.com", portalType: 2,
     detailUrl: (id) => `https://jobs.bytedance.com/experienced/position/${id}/detail`,
+  }),
+  // 生数科技（Vidu）：飞书招聘，99 个岗位，多在北京
+  feishuSource({
+    id: "shengshu", company: "生数科技", host: "shengshu.jobs.feishu.cn", portalType: 2, websitePath: "index",
+    locationCodes: [FEISHU_CITY.深圳, FEISHU_CITY.北京, FEISHU_CITY.上海, FEISHU_CITY.广州, FEISHU_CITY.成都],
+    detailUrl: (id) => `https://shengshu.jobs.feishu.cn/index/position/${id}/detail`,
+  }),
+  // MiniMax：飞书招聘，社招在 website-path: index（206 个岗位）
+  feishuSource({
+    id: "minimax", company: "MiniMax", host: "vrfi1sk8a0.jobs.feishu.cn", portalType: 2, websitePath: "index",
+    // 基础大模型公司岗位集中在北京/上海，只筛深圳只剩 5 个销售岗
+    locationCodes: [FEISHU_CITY.深圳, FEISHU_CITY.北京, FEISHU_CITY.上海, FEISHU_CITY.广州, FEISHU_CITY.成都],
+    detailUrl: (id) => `https://vrfi1sk8a0.jobs.feishu.cn/index/position/${id}/detail`,
   }),
   // 影石 Insta360：同样是飞书招聘，但社招站在 website-path: social（index 是实习站，只有 16 个南京实习岗）
   feishuSource({

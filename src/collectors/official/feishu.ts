@@ -5,8 +5,15 @@ import { http, textify, type OfficialSource } from "./types.js";
  * POST /api/v1/search/job/posts；深圳 = CT_128；列表自带职责 + 要求
  * 注意：字节不能带 website-path 头（会报 site not exist），小米必须带 website-path: index
  */
+/** 飞书招聘的城市编码（默认只要深圳） */
+export const FEISHU_CITY = {
+  深圳: "CT_128", 北京: "CT_11", 上海: "CT_125", 广州: "CT_45", 成都: "CT_22",
+} as const;
+
 export function feishuSource(opt: {
   id: string; company: string; host: string; portalType: number; websitePath?: string; detailUrl: (id: string) => string;
+  /** 要哪些城市；不传 = 只深圳。基础大模型公司岗位集中在北京/上海，只筛深圳会漏掉大半 */
+  locationCodes?: string[];
 }): OfficialSource {
   const headers: Record<string, string> = {
     "portal-channel": "office", "portal-platform": "pc",
@@ -21,7 +28,7 @@ export function feishuSource(opt: {
         method: "POST", headers,
         json: {
           keyword, limit: pageSize, offset: (page - 1) * pageSize,
-          location_code_list: ["CT_128"], recruitment_id_list: ["1"],
+          location_code_list: opt.locationCodes ?? ["CT_128"], recruitment_id_list: ["1"],
           portal_type: opt.portalType, portal_entrance: 1, language: "zh",
         },
       });
