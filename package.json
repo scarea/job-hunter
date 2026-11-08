@@ -11,7 +11,9 @@
     "web": "tsx src/server/index.ts",
     "daily": "tsx src/cli/daily.ts",
     "seed": "tsx src/cli/seed.ts",
-    "login": "tsx src/cli/login.ts"
+    "login": "tsx src/cli/login.ts",
+    "test": "tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "better-sqlite3": "^11.5.0",

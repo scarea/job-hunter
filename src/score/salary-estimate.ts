@@ -25,11 +25,18 @@ export interface SalaryEstimate {
   samples: number;      // 参考了多少条真实数据
 }
 
-/** 公司名归一：「深信服·研发体系」→「深信服」，「XX股份有限公司」→「XX」 */
+/**
+ * 公司名归一：「深信服·研发体系」→「深信服」，「深信服科技股份有限公司」→「深信服」，
+ * 「深圳市腾讯计算机系统有限公司」→「腾讯计算机系统」。
+ * 后缀要反复去（「科技」+「股份有限公司」是两层），否则招聘平台上的全称和官网简称对不上。
+ */
+const CITY_PREFIX = /^(北京|上海|深圳|广州|杭州|成都|武汉|南京|西安|苏州|长沙)(市)?/;
+const SUFFIX = /(股份)?有限(责任)?公司$|集团$|科技$|网络$|信息技术$|数字技术$|技术$|控股$|股份$/;
 export function normCompany(raw: string): string {
   let s = String(raw || "").split(/[·｜|]/)[0].trim();
   s = s.replace(/[（(](北京|上海|深圳|广州|杭州|成都|武汉|南京|西安|苏州|长沙)[^）)]*[）)]/g, "");
-  s = s.replace(/(股份)?有限(责任)?公司$|集团$|科技$|网络$|信息技术$|数字技术$|控股$/, "");
+  s = s.replace(CITY_PREFIX, "");
+  for (let i = 0; i < 4 && SUFFIX.test(s); i++) s = s.replace(SUFFIX, "").trim();
   return s.trim();
 }
 
@@ -73,10 +80,12 @@ const LEVEL_FACTOR: Record<string, number> = { 实习: 0.25, 初级: 0.7, 中级
 
 interface Sample { company: string; title: string; max: number; months: number | null }
 
-let cache: { samples: Sample[]; version: number } | null = null;
+let cache: { samples: Sample[]; version: string } | null = null;
 
 function loadSamples(): Sample[] {
-  const n = (db.prepare("SELECT COUNT(*) c FROM jobs WHERE salary_max > 0").get() as any)?.c ?? 0;
+  // 缓存按「条数 + 最大 id + 薪资总和」判断：只看条数的话，删一条加一条、或补详情改了薪资都识别不出来
+  const sig = db.prepare("SELECT COUNT(*) c, COALESCE(MAX(id),0) m, COALESCE(SUM(salary_max),0) s FROM jobs WHERE salary_max > 0").get() as any;
+  const n = `${sig.c}:${sig.m}:${sig.s}`;
   if (cache && cache.version === n) return cache.samples;
   const rows = db.prepare(`
     SELECT company, title, salary_max AS max, salary_months AS months

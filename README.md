@@ -189,7 +189,14 @@ pnpm score --limit 300          # 只打分
 pnpm login                      # 处理所有需要登录 / 验证的平台（等同看板「一键处理」）
 pnpm login boss --login         # 强制登录 BOSS
 pnpm report                     # 导出 TOP20 到 data/
+pnpm test                       # 跑测试（约 1 秒，离线、不碰真实数据）
 ```
+
+### 测试
+
+`test/` 下 35 个测试，覆盖最容易出错、出过错的地方：薪资解析、岗位 ID（防重复入库）、接口字段映射（防 404 链接）、浏览即采集的导入、否决规则（外包 / 城市 / 关键词误判）、推荐规则（版本、门槛、同公司上限、去重、标签）、关键词策略护栏、薪资估算、各官网适配器（用模拟响应，不联网）。
+
+每个测试文件在自己的临时目录里建空数据库、不读 `.env`、没有 API key，所以不会碰你的数据、不花钱。改了解析 / 规则 / 适配器后先跑一遍 `pnpm test`；推送到 GitHub 时也会自动跑（`.github/workflows/test.yml`）。
 
 同一时间只能跑一个任务（文件锁）；看板上点「去处理」时如果有任务在跑，会排队，跑完自动弹窗。
 
@@ -261,6 +268,7 @@ src/
 ├── score/               规则、Prompt、LLM 调用、批量初筛、薪资解析
 ├── cli/                 daily / collect / score / login / report
 └── server/              看板（Express + 静态页，只监听本机）
+test/                    自动化测试（pnpm test）
 ```
 
 ## 合规与免责
